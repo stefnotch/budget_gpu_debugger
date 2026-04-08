@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>budget_gpu_debugger</title>
+  </head>
+  <body>
+    <header>
+      <h2>GPU Debugger</h2>
+      <div>
+        <button class="step-backwards">Step Backwards</button>
+        <button class="step-forwards">Step Forwards</button>
+      </div>
+    </header>
+    <main>
+      <pre class="input"></pre>
+    </main>
+
+    <pre class="errors"></pre>
+    <canvas></canvas>
+
+    <script type="module" src="/src/init.ts"></script>
+  </body>
+</html>
