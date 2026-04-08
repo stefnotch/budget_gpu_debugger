@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>budget_gpu_debugger</title>
+    <style>
+      html, body {
+        margin: 0px;
+        height: 100%;
+      }
+      main {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto auto 1fr;
+        height: 100%;
+      }
+      pre {
+        border-top: 1px solid gray;
+        overflow: scroll;
+      }
+      .output {
+        border-left: 1px solid black;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <!--Titles-->
+      <h2>Code editor</h2>
+      <h2>Debugger</h2>
+      <!--Buttons-->
+      <div></div>
+      <div>
+        <button>Step Forwards</button>
+        <button>Step Backwards</button>
+      </div>
+      <!--Output-->
+      <pre
+        contenteditable="plaintext-only"
+        class="input"
+      ></pre>
+      <pre class="output"></pre>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
