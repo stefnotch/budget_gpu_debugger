@@ -7,6 +7,12 @@ const codeOutput = document.querySelector<HTMLPreElement>(".output")!;
 const errorsOutput = document.querySelector<HTMLPreElement>(".errors")!;
 const canvas = document.querySelector<HTMLCanvasElement>("canvas")!;
 const debugButton = document.querySelector<HTMLButtonElement>(".debug-button")!;
+const stepForwardsButton = document.querySelector<HTMLButtonElement>(
+  ".step-forwards-button",
+)!;
+const stepBackwardsButton = document.querySelector<HTMLButtonElement>(
+  ".step-backwards-button",
+)!;
 
 codeInput.innerText = shaderString;
 
@@ -14,17 +20,32 @@ const context = canvas.getContext("webgpu")!;
 const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
 context.configure({ device, format: presentationFormat });
 
-//
+type AppState = {
+  id: "editing";
+} | {
+  id: "request-debug";
+} | {
+  id: "debugging";
+  step: number;
+  data: ArrayBuffer;
+};
+let state: AppState = { id: "editing" };
+
 let debugPosition = [0, 0];
-let isDebug = false;
+let variablesById: Variable[] = [];
 debugButton.addEventListener("click", () => {
-  isDebug = true;
+  state = { id: "request-debug" };
 });
 function writeDebug() {
   device.queue.writeBuffer(
     debugBuffer,
     0,
-    new Uint32Array([debugPosition[0], debugPosition[1], isDebug ? 1 : 0, 0]),
+    new Uint32Array([
+      debugPosition[0],
+      debugPosition[1],
+      state.id == "request-debug" ? 1 : 0,
+      0,
+    ]),
   );
 }
 const DEBUG_SIZE = 10000;
@@ -33,31 +54,39 @@ const debugBuffer = device.createBuffer({
   usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC |
     GPUBufferUsage.COPY_DST,
 });
-writeDebug();
 const debugReadBuffer = device.createBuffer({
   size: DEBUG_SIZE,
   usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
 });
-const variablesById: Variable[] = [];
 async function readDebug() {
   await debugReadBuffer.mapAsync(GPUMapMode.READ);
-  const results = new Uint32Array(debugReadBuffer.getMappedRange());
-
-  const length = results[3];
-  const debugData = results.slice(4, 4 + length);
-  const debugDataFloat = new Float32Array(debugData.buffer);
+  const results = debugReadBuffer.getMappedRange();
+  const header = new Uint32Array(results.slice(0, 16));
+  const length = header[3];
+  if (state.id === "debugging") {
+    state.data = results.slice(16, 16 + 4 * length);
+  }
+  debugReadBuffer.unmap();
+}
+function renderDebug() {
+  if (state.id !== "debugging") {
+    return;
+  }
+  const debugDataU32 = new Uint32Array(state.data);
+  const debugDataFloat = new Float32Array(state.data);
 
   const outputLines: string[] = []; // Javascript allows for arrays with holes
 
+  let step = 0;
   let i = 0;
-  while (i < debugData.length) {
-    const lineNumber = debugData[i++];
-    const variableId = debugData[i++];
+  while (i < debugDataU32.length) {
+    const lineNumber = debugDataU32[i++];
+    const variableId = debugDataU32[i++];
     const variable = variablesById[variableId];
 
     let value = "";
     if (variable.type === "u32") {
-      value = "" + debugData[i++];
+      value = "" + debugDataU32[i++];
     } else if (variable.type === "f32") {
       value = "" + debugDataFloat[i++];
     } else if (variable.type === "vec2f") {
@@ -68,16 +97,29 @@ async function readDebug() {
     }
 
     outputLines[lineNumber] = variable.name + " = " + value;
+
+    step += 1;
+    if (step > state.step) break;
   }
 
   codeOutput.innerText = outputLines.join("\n");
-
-  debugReadBuffer.unmap();
 }
+stepForwardsButton.addEventListener("click", () => {
+  if (state.id === "debugging") {
+    state.step += 1;
+    renderDebug();
+  }
+});
+stepBackwardsButton.addEventListener("click", () => {
+  if (state.id === "debugging") {
+    state.step = Math.max(0, state.step - 1);
+    renderDebug();
+  }
+});
 
 canvas.addEventListener("click", (event) => {
   debugPosition = [event.offsetX, event.offsetY];
-  isDebug = true;
+  state = { id: "request-debug" };
 });
 
 const bindGroupLayout0 = device.createBindGroupLayout({
@@ -206,12 +248,10 @@ function createDebugRenderPipeline() {
 createDebugRenderPipeline();
 
 function render() {
-  const wasDebug = isDebug;
   let renderPipeline = pipeline;
-  if (isDebug) {
+  if (state.id === "request-debug") {
     renderPipeline = createDebugRenderPipeline();
     writeDebug();
-    isDebug = false;
   }
 
   const encoder = device.createCommandEncoder();
@@ -229,7 +269,7 @@ function render() {
   pass.draw(3);
   pass.end();
 
-  if (wasDebug) {
+  if (state.id === "request-debug") {
     encoder.copyBufferToBuffer(debugBuffer, debugReadBuffer);
   }
 
@@ -237,9 +277,15 @@ function render() {
     encoder.finish(),
   ]);
 
-  if (wasDebug) {
+  if (state.id === "request-debug") {
+    state = {
+      id: "debugging",
+      step: 0,
+      data: new ArrayBuffer(),
+    };
     writeDebug();
-    readDebug(); // happens async
+
+    readDebug().then(() => renderDebug()); // happens async
   }
 
   requestAnimationFrame(render);
