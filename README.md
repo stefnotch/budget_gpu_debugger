@@ -8,13 +8,15 @@ Steps
 - [x] Add a textarea
 - [x] Add a hello triangle
 - [x] Turn it into a hello quad and use the textarea code
-- [ ] Add a "debug buffer"
+- [x] Add a "debug buffer"
 - [ ] Read the "debug buffer"
 - [x] Add a div to the left of the textarea where we can display breakpoints and the "current line"
 - [x] Add a bigger div to the left where we can display the debugger UI
-  - Step
-  - Variables
-- 
+  - [x] Step
+- [x] Debug button
+  - [x] Enable debug mode
+  - [x] Write to gpu buffer
+  - [x] Read GPU buffer
 ...
 
 
@@ -29,7 +31,6 @@ And the UI is: click on pixel. Set the debugPixel uniform. @fragment fn main wil
 Next UI: step forwards/backwards. That just increments a "until command" and then rerenders the entire debugger textarea.
 Debugger textarea: data = Array(lineCount).fill("");
 And for everything in the GPU buffer until our "until command" we do data[buffer.current line number] = variables[buffer.id].name + ": " + render(variables[id].type, buffer.value);
-https://stackoverflow.com/a/64792984/3492994
 
 ## Rejected ideas
 - https://codemirror.net/5/ for the code editor

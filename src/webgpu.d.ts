@@ -18,3 +18,10 @@ interface HTMLCanvasElement {
         contextId: "webgpu",
     ): GPUCanvasContext | null;
 }
+
+interface GPUMapMode {
+    readonly READ: GPUFlagsConstant;
+    readonly WRITE: GPUFlagsConstant;
+}
+
+declare var GPUMapMode: GPUMapMode;

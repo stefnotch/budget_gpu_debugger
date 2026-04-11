@@ -6,6 +6,7 @@ const codeInput = document.querySelector<HTMLPreElement>(".input")!;
 const codeOutput = document.querySelector<HTMLPreElement>(".output")!;
 const errorsOutput = document.querySelector<HTMLPreElement>(".errors")!;
 const canvas = document.querySelector<HTMLCanvasElement>("canvas")!;
+const debugButton = document.querySelector<HTMLButtonElement>(".debug-button")!;
 
 codeInput.innerText = shaderString;
 
@@ -42,17 +43,42 @@ codeInput.addEventListener(
   }, 1000),
 );
 
+//
+let debugPosition = [0, 0];
+let isDebug = false;
+debugButton.addEventListener("click", () => {
+  isDebug = true;
+});
+function writeDebug() {
+  device.queue.writeBuffer(
+    debugBuffer,
+    0,
+    new Uint32Array([debugPosition[0], debugPosition[1], isDebug ? 1 : 0, 0]),
+  );
+}
 const DEBUG_SIZE = 10000;
 const debugBuffer = device.createBuffer({
   size: DEBUG_SIZE,
   usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC |
     GPUBufferUsage.COPY_DST,
 });
-device.queue.writeBuffer(debugBuffer, 0, new Uint32Array([0, 0, 0, 0]));
+writeDebug();
 const debugReadBuffer = device.createBuffer({
   size: DEBUG_SIZE,
   usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
 });
+async function readDebug() {
+  await debugReadBuffer.mapAsync(GPUMapMode.READ);
+  const results = new Uint32Array(debugReadBuffer.getMappedRange());
+
+  const length = results[3];
+  const debugData = results.slice(4, 4 + length);
+
+  codeOutput.innerText = "" + debugData;
+
+  debugReadBuffer.unmap();
+}
+
 const bindGroup0 = device.createBindGroup({
   layout: pipeline.getBindGroupLayout(0),
   entries: [
@@ -61,6 +87,12 @@ const bindGroup0 = device.createBindGroup({
 });
 
 function render() {
+  let wasDebug = isDebug;
+  if (isDebug) {
+    writeDebug();
+    isDebug = false;
+  }
+
   const encoder = device.createCommandEncoder();
   const pass = encoder.beginRenderPass({
     colorAttachments: [{
@@ -76,9 +108,18 @@ function render() {
   pass.draw(3);
   pass.end();
 
+  if (wasDebug) {
+    encoder.copyBufferToBuffer(debugBuffer, debugReadBuffer);
+  }
+
   device.queue.submit([
     encoder.finish(),
   ]);
+
+  if (wasDebug) {
+    writeDebug();
+    readDebug(); // happens async
+  }
 
   requestAnimationFrame(render);
 }
