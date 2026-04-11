@@ -18,20 +18,19 @@ Steps
   - [x] Write to gpu buffer
   - [x] Read GPU buffer
 - [x] Click on canvas to get data
+- [x] Generate debug pipeline
+  - [x] Parse the brackets (scopes)
+  - [x] Create a variable map
+  - [x] Parse the variable declarations
+  - [x] Parse the variable assignments
+  - [x] Inject debug method calls
 ...
 
 
 
-
-
-Keep track of the variables Map<name, {line, type, id}> and a reverse Map<id, name>
-Insert a generic if(pixelCoord==debugPixel) { dbg(current line number, variable ID, variable value); }. That function just appends to a buffer.
-Then run the shader. Read out the buffer.
-And the UI is: click on pixel. Set the debugPixel uniform. @fragment fn main will write the current pixel coord to a var<private> so we can access the info everywhere.
 Next UI: step forwards/backwards. That just increments a "until command" and then rerenders the entire debugger textarea.
 Debugger textarea: data = Array(lineCount).fill("");
 And for everything in the GPU buffer until our "until command" we do data[buffer.current line number] = variables[buffer.id].name + ": " + render(variables[id].type, buffer.value);
-We do need to count the scopes so that we know when we can legally insert `dbg_()` function calls.
 
 ## Rejected ideas
 - https://codemirror.net/5/ for the code editor

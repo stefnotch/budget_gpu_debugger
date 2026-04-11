@@ -5,8 +5,6 @@ fn frag_main(input: VertexOutput) -> @location(0) vec4f {
     is_debug = debug_data.debug_enabled != 0 && 
         all(debug_data.debug_position == vec2u(input.position.xy));
 
-    dbg_u32(12, 3, my_data);
-
     let color: f32 = mandelbrot(input.uv * 3.0 - vec2f(2.0, 1.5));
     return vec4(vec3f(color), 1);
 }

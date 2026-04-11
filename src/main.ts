@@ -38,14 +38,39 @@ const debugReadBuffer = device.createBuffer({
   size: DEBUG_SIZE,
   usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
 });
+const variablesById: Variable[] = [];
 async function readDebug() {
   await debugReadBuffer.mapAsync(GPUMapMode.READ);
   const results = new Uint32Array(debugReadBuffer.getMappedRange());
 
   const length = results[3];
   const debugData = results.slice(4, 4 + length);
+  const debugDataFloat = new Float32Array(debugData.buffer);
 
-  codeOutput.innerText = "" + debugData;
+  const outputLines: string[] = []; // Javascript allows for arrays with holes
+
+  let i = 0;
+  while (i < debugData.length) {
+    const lineNumber = debugData[i++];
+    const variableId = debugData[i++];
+    const variable = variablesById[variableId];
+
+    let value = "";
+    if (variable.type === "u32") {
+      value = "" + debugData[i++];
+    } else if (variable.type === "f32") {
+      value = "" + debugDataFloat[i++];
+    } else if (variable.type === "vec2f") {
+      value = "" + debugDataFloat[i++] + ", " + debugDataFloat[i++];
+    } else {
+      console.error("Unknown type", variable.type);
+      break;
+    }
+
+    outputLines[lineNumber] = variable.name + " = " + value;
+  }
+
+  codeOutput.innerText = outputLines.join("\n");
 
   debugReadBuffer.unmap();
 }
@@ -104,6 +129,7 @@ codeInput.addEventListener(
 );
 
 interface Variable {
+  name: string;
   type: string;
   id: number;
   line: number;
@@ -113,9 +139,10 @@ function createDebugRenderPipeline() {
   const code = codeInput.innerText;
 
   const lines = code.split("\n");
-  const outputLines = Array(lines.length).fill("");
+  const outputLines: string[] = []; // Javascript allows for arrays with holes
 
   const variables = new Map<string, Variable>();
+  variablesById.length = 0;
 
   let scopeCounter = 0;
   for (let i = 0; i < lines.length; i++) {
@@ -139,14 +166,15 @@ function createDebugRenderPipeline() {
       /(let|var|const) (?<name>[a-zA-Z0-9_]+) ?: ?(?<type>[a-zA-Z0-9_]+)/,
     );
     if (variableMatch !== null) {
-      const name = variableMatch.groups!["name"];
-      const type = variableMatch.groups!["type"];
-      variables.set(name, {
-        type,
-        id: variables.size,
+      const variable: Variable = {
+        name: variableMatch.groups!["name"],
+        type: variableMatch.groups!["type"],
+        id: variablesById.length,
         line: i,
-      });
-      debugVariable = name;
+      };
+      variables.set(variable.name, variable);
+      variablesById.push(variable);
+      debugVariable = variable.name;
     }
 
     // Variable assignments
@@ -162,9 +190,10 @@ function createDebugRenderPipeline() {
         variable.type,
       );
       if (isKnownType) {
-        lines[i] = line +
-          ` dbg_${variable.type}(${i},${variable.id},${debugVariable});`;
-        outputLines[i] = lines[i];
+        const debugCall =
+          `dbg_${variable.type}(${i},${variable.id},${debugVariable});`;
+        lines[i] = line + " " + debugCall;
+        outputLines[i] = debugCall;
       }
     }
   }
