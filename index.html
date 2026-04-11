@@ -12,31 +12,38 @@
       }
       main {
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        grid-template-rows: auto auto 1fr;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        grid-template-rows: auto auto minmax(min-content, 1fr);
         height: 100%;
       }
       pre {
         border-top: 1px solid gray;
         overflow: scroll;
         margin-bottom: 0px;
+        padding: 4px;
       }
       .output {
-        border-left: 1px solid black;
+        border-left: 2px solid gray;
+        color: black;
       }
       canvas {
-        position: absolute;
+        position: fixed;
         border: 2px solid blue;
         bottom: 10px;
         right: 10px;
       }
       .errors {
-        position: absolute;
+        position: fixed;
         border: 2px solid red;
         bottom: 10px;
         left: 10px;
         height: 4em;
         width: calc(50% - 20px);
+      }
+      @media (prefers-color-scheme: dark) {
+        .output {
+          color: white;
+        }
       }
     </style>
   </head>

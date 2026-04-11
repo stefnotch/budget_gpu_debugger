@@ -24,7 +24,6 @@ Steps
 
 
 
-Go over every line. Categorize (try a few regex)
 Keep track of the variables Map<name, {line, type, id}> and a reverse Map<id, name>
 Insert a generic if(pixelCoord==debugPixel) { dbg(current line number, variable ID, variable value); }. That function just appends to a buffer.
 Then run the shader. Read out the buffer.
@@ -32,6 +31,7 @@ And the UI is: click on pixel. Set the debugPixel uniform. @fragment fn main wil
 Next UI: step forwards/backwards. That just increments a "until command" and then rerenders the entire debugger textarea.
 Debugger textarea: data = Array(lineCount).fill("");
 And for everything in the GPU buffer until our "until command" we do data[buffer.current line number] = variables[buffer.id].name + ": " + render(variables[id].type, buffer.value);
+We do need to count the scopes so that we know when we can legally insert `dbg_()` function calls.
 
 ## Rejected ideas
 - https://codemirror.net/5/ for the code editor
@@ -41,3 +41,7 @@ And for everything in the GPU buffer until our "until command" we do data[buffer
 - We keep the default canvas size, because otherwise we have to deal with making screen pixels and canvas drawing buffer sizes match up https://webgpufundamentals.org/webgpu/lessons/webgpu-resizing-the-canvas.html . Having CSS pixels and canvas pixels match up also simplifies our mouse picking code
 - We put the shader in a separate file so that the modifications are "persistent". Also, wgsl-analyzer is bae.
 - We need a separate buffer that is mappable. `GPUBufferUsage.STORAGE` and `GPUBufferUsage.MAP_READ` cannot be combined.
+- Simplifying assumptions (no compiler today)
+  - Every relevant statement fits on one line.
+  - We can just append code to lines with statements. No comment at the end.
+  - Every variable declaration has an explicit type. No type inference.

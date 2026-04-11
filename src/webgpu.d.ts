@@ -25,3 +25,11 @@ interface GPUMapMode {
 }
 
 declare var GPUMapMode: GPUMapMode;
+
+interface GPUShaderStage {
+    readonly VERTEX: GPUFlagsConstant;
+    readonly FRAGMENT: GPUFlagsConstant;
+    readonly COMPUTE: GPUFlagsConstant;
+}
+
+declare var GPUShaderStage: GPUShaderStage;
