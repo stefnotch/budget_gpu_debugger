@@ -79,6 +79,11 @@ async function readDebug() {
   debugReadBuffer.unmap();
 }
 
+canvas.addEventListener("click", (event) => {
+  debugPosition = [event.offsetX, event.offsetY];
+  isDebug = true;
+});
+
 const bindGroup0 = device.createBindGroup({
   layout: pipeline.getBindGroupLayout(0),
   entries: [

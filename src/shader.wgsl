@@ -1,6 +1,6 @@
 @fragment
 fn frag_main(input: VertexOutput) -> @location(0) vec4f {
-    let frame = 3;
+    let my_data: u32 = u32(input.position.x);
 
     is_debug = debug_data.debug_enabled != 0 && 
         all(debug_data.debug_position == vec2u(input.position.xy));
@@ -9,7 +9,7 @@ fn frag_main(input: VertexOutput) -> @location(0) vec4f {
         return vec4(1, 0, 0, 1);
     }
 
-    dbg_u32(12, 3, 3);
+    dbg_u32(12, 3, my_data);
 
     return vec4(0.3, 1, 0, 1);
 }

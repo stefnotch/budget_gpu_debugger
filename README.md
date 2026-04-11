@@ -17,6 +17,7 @@ Steps
   - [x] Enable debug mode
   - [x] Write to gpu buffer
   - [x] Read GPU buffer
+- [x] Click on canvas to get data
 ...
 
 
@@ -37,6 +38,6 @@ And for everything in the GPU buffer until our "until command" we do data[buffer
 
 ## Bonus notes
 
-- We keep the default canvas size, because otherwise we have to deal with making screen pixels and canvas drawing buffer sizes match up https://webgpufundamentals.org/webgpu/lessons/webgpu-resizing-the-canvas.html
+- We keep the default canvas size, because otherwise we have to deal with making screen pixels and canvas drawing buffer sizes match up https://webgpufundamentals.org/webgpu/lessons/webgpu-resizing-the-canvas.html . Having CSS pixels and canvas pixels match up also simplifies our mouse picking code
 - We put the shader in a separate file so that the modifications are "persistent". Also, wgsl-analyzer is bae.
 - We need a separate buffer that is mappable. `GPUBufferUsage.STORAGE` and `GPUBufferUsage.MAP_READ` cannot be combined.
