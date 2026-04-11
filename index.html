@@ -8,19 +8,29 @@
     <style>
       html, body {
         margin: 0px;
-        height: 100%;
+        --bg: #16171d;
+      }
+      header {
+        position: sticky;
+        top: 0;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        background: var(--bg);
+        padding: 8px;
+        border-bottom: 1px solid gray;
       }
       main {
         display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         grid-template-rows: auto auto minmax(min-content, 1fr);
-        height: 100%;
       }
       pre {
-        border-top: 1px solid gray;
         overflow: scroll;
-        margin-bottom: 0px;
+        margin: 0px;
         padding: 4px;
+      }
+      .input {
+        min-height: 100vh;
       }
       .output {
         border-left: 2px solid gray;
@@ -37,8 +47,10 @@
         border: 2px solid red;
         bottom: 10px;
         left: 10px;
-        height: 4em;
+        height: 6em;
         width: calc(50% - 20px);
+        display: none;
+        background: var(--bg);
       }
       @media (prefers-color-scheme: dark) {
         .output {
@@ -48,17 +60,18 @@
     </style>
   </head>
   <body>
-    <main>
+    <header>
       <!--Titles-->
       <h2>Code editor</h2>
       <h2>Debugger</h2>
       <!--Buttons-->
       <div></div>
       <div>
-        <button class="debug-button">Debug</button>
-        <button class="step-forwards-button">Step Forwards</button>
-        <button class="step-backwards-button">Step Backwards</button>
+        <button class="step-forwards">Step Forwards</button>
+        <button class="step-backwards">Step Backwards</button>
       </div>
+    </header>
+    <main>
       <!--Output-->
       <pre
         contenteditable="plaintext-only"

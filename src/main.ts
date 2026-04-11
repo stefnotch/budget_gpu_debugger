@@ -6,12 +6,11 @@ const codeInput = document.querySelector<HTMLPreElement>(".input")!;
 const codeOutput = document.querySelector<HTMLPreElement>(".output")!;
 const errorsOutput = document.querySelector<HTMLPreElement>(".errors")!;
 const canvas = document.querySelector<HTMLCanvasElement>("canvas")!;
-const debugButton = document.querySelector<HTMLButtonElement>(".debug-button")!;
 const stepForwardsButton = document.querySelector<HTMLButtonElement>(
-  ".step-forwards-button",
+  ".step-forwards",
 )!;
 const stepBackwardsButton = document.querySelector<HTMLButtonElement>(
-  ".step-backwards-button",
+  ".step-backwards",
 )!;
 
 codeInput.innerText = shaderString;
@@ -24,6 +23,7 @@ type AppState = {
   id: "editing";
 } | {
   id: "request-debug";
+  position: [number, number];
 } | {
   id: "debugging";
   step: number;
@@ -31,22 +31,17 @@ type AppState = {
 };
 let state: AppState = { id: "editing" };
 
-let debugPosition = [0, 0];
 let variablesById: Variable[] = [];
-debugButton.addEventListener("click", () => {
-  state = { id: "request-debug" };
-});
 function writeDebug() {
-  device.queue.writeBuffer(
-    debugBuffer,
-    0,
-    new Uint32Array([
-      debugPosition[0],
-      debugPosition[1],
-      state.id == "request-debug" ? 1 : 0,
+  if (state.id == "request-debug") {
+    device.queue.writeBuffer(
+      debugBuffer,
       0,
-    ]),
-  );
+      new Uint32Array([state.position[0], state.position[1], 1, 0]),
+    );
+  } else {
+    device.queue.writeBuffer(debugBuffer, 0, new Uint32Array([0, 0, 0, 0]));
+  }
 }
 const DEBUG_SIZE = 10000;
 const debugBuffer = device.createBuffer({
@@ -118,8 +113,7 @@ stepBackwardsButton.addEventListener("click", () => {
 });
 
 canvas.addEventListener("click", (event) => {
-  debugPosition = [event.offsetX, event.offsetY];
-  state = { id: "request-debug" };
+  state = { id: "request-debug", position: [event.offsetX, event.offsetY] };
 });
 
 const bindGroupLayout0 = device.createBindGroupLayout({
@@ -148,6 +142,11 @@ function createRenderPipeline(fragmentShader: string) {
     errorsOutput.innerText = "";
     for (const message of info.messages) {
       errorsOutput.innerText += message.message + "\n";
+    }
+    if (info.messages.length > 0) {
+      errorsOutput.style.display = "initial";
+    } else {
+      errorsOutput.style.display = "none";
     }
   });
 
@@ -235,7 +234,8 @@ function createDebugRenderPipeline() {
         const debugCall =
           `dbg_${variable.type}(${i},${variable.id},${debugVariable});`;
         lines[i] = line + " " + debugCall;
-        outputLines[i] = debugCall;
+        outputLines[i] = (outputLines[i] ?? "") + "  ".repeat(scopeCounter) +
+          debugCall;
       }
     }
   }
