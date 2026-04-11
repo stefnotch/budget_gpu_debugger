@@ -19,9 +19,24 @@
       pre {
         border-top: 1px solid gray;
         overflow: scroll;
+        margin-bottom: 0px;
       }
       .output {
         border-left: 1px solid black;
+      }
+      canvas {
+        position: absolute;
+        border: 2px solid blue;
+        bottom: 10px;
+        right: 10px;
+      }
+      .errors {
+        position: absolute;
+        border: 2px solid red;
+        bottom: 10px;
+        left: 10px;
+        height: 4em;
+        width: calc(50% - 20px);
       }
     </style>
   </head>
@@ -43,6 +58,9 @@
       ></pre>
       <pre class="output"></pre>
     </main>
+
+    <pre class="errors"></pre>
+    <canvas></canvas>
 
     <script type="module" src="/src/main.ts"></script>
   </body>
