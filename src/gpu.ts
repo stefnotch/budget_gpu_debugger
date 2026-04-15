@@ -1,10 +1,10 @@
 const adapter = await navigator.gpu.requestAdapter();
-export const device = await adapter?.requestDevice()!;
+export let device = await adapter?.requestDevice()!;
 if (!device) {
   alert("Browser doesn't support WebGPU");
 }
 
-export const vertexShader = device.createShaderModule({
+export let vertexShader = device.createShaderModule({
   code: /* wgsl */ `
 struct VertexOutput {
     @builtin(position) position: vec4f,
@@ -26,12 +26,3 @@ fn vs(@builtin(vertex_index) vertexIndex : u32) -> VertexOutput {
   return vsOutput;
 }`,
 });
-
-export function debounce<T extends Function>(cb: T, wait = 1000) {
-  let h = 0;
-  let callable = (...args: any) => {
-    clearTimeout(h);
-    h = setTimeout(() => cb(...args), wait);
-  };
-  return callable as any as T;
-}

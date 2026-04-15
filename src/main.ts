@@ -1,4 +1,5 @@
-import { debounce, device, vertexShader } from "./gpu";
+import { device, vertexShader } from "./gpu";
+import { debounce } from "./utils";
 import "./style.css";
 import shaderString from "./shader.wgsl?raw";
 
@@ -32,6 +33,17 @@ type AppState = {
 let state: AppState = { id: "editing" };
 
 let variablesById: Variable[] = [];
+
+const DEBUG_SIZE = 10000;
+const debugBuffer = device.createBuffer({
+  size: DEBUG_SIZE,
+  usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC |
+    GPUBufferUsage.COPY_DST,
+});
+const debugReadBuffer = device.createBuffer({
+  size: DEBUG_SIZE,
+  usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+});
 function writeDebug() {
   if (state.id == "request-debug") {
     device.queue.writeBuffer(
@@ -43,16 +55,6 @@ function writeDebug() {
     device.queue.writeBuffer(debugBuffer, 0, new Uint32Array([0, 0, 0, 0]));
   }
 }
-const DEBUG_SIZE = 10000;
-const debugBuffer = device.createBuffer({
-  size: DEBUG_SIZE,
-  usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC |
-    GPUBufferUsage.COPY_DST,
-});
-const debugReadBuffer = device.createBuffer({
-  size: DEBUG_SIZE,
-  usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
-});
 async function readDebug() {
   await debugReadBuffer.mapAsync(GPUMapMode.READ);
   const results = debugReadBuffer.getMappedRange();
@@ -189,11 +191,9 @@ function createDebugRenderPipeline() {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (line.includes("{")) {
-      outputLines[i] = "  ".repeat(scopeCounter) + "{";
       scopeCounter += 1;
     } else if (line.includes("}")) {
       scopeCounter -= 1;
-      outputLines[i] = "  ".repeat(scopeCounter) + "}";
     }
 
     if (line.includes("// ignore")) {

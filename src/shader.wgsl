@@ -38,14 +38,14 @@ struct VertexOutput {
 struct DebugData {
     debug_position: vec2u,
     debug_enabled: u32,
-    index: atomic<u32>,
+    length: atomic<u32>,
     data: array<u32>,
 }
 @group(0) @binding(0) var<storage, read_write> debug_data: DebugData;
 var<private> is_debug: bool;
 fn dbg_u32(line_number: u32, variable_id: u32, variable_value: u32) {
     if is_debug {
-        let index = atomicAdd(&debug_data.index, 3);
+        let index = atomicAdd(&debug_data.length, 3);
         debug_data.data[index] = line_number;
         debug_data.data[index + 1] = variable_id;
         debug_data.data[index + 2] = variable_value;
@@ -56,7 +56,7 @@ fn dbg_f32(line_number: u32, variable_id: u32, variable_value: f32) {
 }
 fn dbg_vec2f(line_number: u32, variable_id: u32, variable_value: vec2f) {
     if is_debug {
-        let index = atomicAdd(&debug_data.index, 4);
+        let index = atomicAdd(&debug_data.length, 4);
         debug_data.data[index] = line_number;
         debug_data.data[index + 1] = variable_id;
         debug_data.data[index + 2] = bitcast<u32>(variable_value.x);
