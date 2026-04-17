@@ -1,61 +1,90 @@
 :root {
-  font-family: "Courier New", Courier, monospace;
-  --background-color: #f7f8fa;
+  font-family: "Franklin Gothic Medium", "Arial Narrow", Arial, sans-serif;
+  --bg: #fdfdfd;
+  --bg-elevated: #eff0f3;
   --text: #1e2430;
 }
 html, body {
   margin: 0;
   height: 100%;
-  background: var(--background-color);
+  background: var(--bg-elevated);
   color: var(--text);
 }
 
 header {
   position: sticky;
   top: 0;
-  z-index: 20;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 0.7fr);
-  padding: 8px;
-  border-bottom: 1px solid gray;
-  background: var(--background-color);
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 12px 12px 8px 12px;
+  background: var(--bg-elevated);
+  z-index: 20;
+}
+main {
+  margin: 10px;
+  background: var(--bg);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
 }
 h2 {
   margin: 0;
-  margin-bottom: 4px;
 }
-main {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 0.7fr);
-  grid-template-rows: auto auto minmax(min-content, 1fr);
+button {
+  background: none;
+  border: 2px solid var(--text);
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
 }
-.input, .output {
+button:hover {
+  background: var(--text);
+  color: var(--bg);
+}
+.input {
   font-size: 13px;
   line-height: 16px;
   margin: 0px;
   padding: 4px;
-}
-.input {
-  overflow: scroll;
+  white-space: pre;
   min-height: 100vh;
+  position: relative;
+  z-index: 10;
 }
-.output {
-  border-left: 2px solid gray;
-  color: darkblue;
+.annotation {
+  /* styled like inlay hints in code editors */
+  font-size: 11px;
+  color: grey;
+  margin-left: 12px;
+  background: rgba(128, 128, 128, 0.1);
+  padding: 0 2px;
+  border-radius: 2px;
+}
+.highlight-annotation {
+  display: inline-block;
+  background: rgba(244, 244, 73, 0.737);
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 16px;
+  z-index: -1;
 }
 canvas {
   position: fixed;
   border: 2px solid grey;
   bottom: 10px;
   right: 10px;
+  z-index: 20;
 }
 .errors {
   position: fixed;
   border: 2px solid red;
-  bottom: 10px;
+  padding: 0px 8px;
+  bottom: 0px;
   left: 10px;
-  height: 6em;
-  width: calc(50% - 20px);
+  right: 10px;
+  height: 10em;
   display: none;
-  background: var(--background-color);
+  background: var(--bg);
+  overflow: auto;
+  z-index: 20;
 }

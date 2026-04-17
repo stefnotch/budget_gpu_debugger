@@ -9,27 +9,22 @@
   <body>
     <header>
       <!--Titles-->
-      <h2>Shader code</h2>
-      <h2>Debugger</h2>
-      <!--Buttons-->
-      <div></div>
+      <h2>GPU Debugger</h2>
       <div>
-        <button class="step-forwards">Step Forwards</button>
         <button class="step-backwards">Step Backwards</button>
+        <button class="step-forwards">Step Forwards</button>
       </div>
     </header>
     <main>
       <!--Output-->
       <pre
-        contenteditable="plaintext-only"
         class="input"
       ></pre>
-      <div class="output"></div>
     </main>
 
     <pre class="errors"></pre>
     <canvas></canvas>
 
-    <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/src/init.ts"></script>
   </body>
 </html>

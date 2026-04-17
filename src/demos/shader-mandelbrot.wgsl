@@ -1,12 +1,33 @@
 @fragment
 fn frag_main(input: VertexOutput) -> @location(0) vec4f {
+    let my_data: u32 = u32(input.position.x);
+
     is_debug = debug_data.debug_enabled != 0 && 
         all(debug_data.debug_position == vec2u(input.position.xy));
 
-    let pos: vec2f = input.uv - 0.5;
-    let angle: f32 = atan2(pos.y, pos.x);
-    let t: f32 = sin(30. * (length(pos) + 0.2 * angle));
-    return vec4(vec3f(t), 1);
+    let color: f32 = mandelbrot(input.uv * 3.0 - vec2f(2.0, 1.5));
+    return vec4(vec3f(color), 1);
+}
+
+/// The function z -> z^2 + c
+fn quadraticMap(z: vec2f, c: vec2f) -> vec2f {
+    return vec2f(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + c;
+}
+
+/// Evaluates the mandelbrot set, and returns how long it takes to escape
+/// 0 => escapes instantly
+/// 1 => did not escape
+fn mandelbrot(position: vec2f) -> f32 {
+    const maxIterations: u32 = 100;
+
+    var current: vec2f = vec2f(0.0);
+    for (var i: u32 = 0; i < maxIterations; i++) {
+        current = quadraticMap(current, position);
+        if dot(current, current) > 4.0 {
+            return f32(i) / f32(maxIterations);
+        }
+    }
+    return 1.0;
 }
 
 // ignore

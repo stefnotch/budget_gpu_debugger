@@ -1,20 +1,56 @@
-import { device, vertexShader } from "./gpu";
-import { debounce } from "./utils";
+import { device } from "./gpu";
 import "./style.css";
 import shaderString from "./shader.wgsl?raw";
 
-const codeInput = document.querySelector<HTMLPreElement>(".input")!;
-const codeOutput = document.querySelector<HTMLPreElement>(".output")!;
-const errorsOutput = document.querySelector<HTMLPreElement>(".errors")!;
+function drawUI(annotations: string[], currentLine: number | null) {
+  const codeInput = document.querySelector<HTMLPreElement>(".input")!;
+  codeInput.innerHTML = ""; // Clear existing content
+
+  // Draw the shader code with annotations
+  shaderString.split("\n").forEach((line, i) => {
+    if (i == currentLine) {
+      const highlightSpan = document.createElement("span");
+      highlightSpan.classList.add("highlight-annotation");
+      codeInput.append(highlightSpan);
+      highlightSpan.scrollIntoView({ block: "nearest" });
+    }
+
+    const codeSpan = document.createElement("span");
+    codeSpan.innerText = line;
+    codeInput.append(codeSpan);
+
+    if (annotations[i]) {
+      const annotationSpan = document.createElement("span");
+      annotationSpan.classList.add("annotation");
+      annotationSpan.innerText = annotations[i];
+      codeInput.append(annotationSpan);
+    }
+
+    codeInput.append(document.createElement("br"));
+  });
+}
+drawUI([], null);
+
+function drawErrorsUI(info: GPUCompilationInfo) {
+  const errorsOutput = document.querySelector<HTMLPreElement>(".errors")!;
+  errorsOutput.innerText = "";
+  for (const message of info.messages) {
+    errorsOutput.innerText += message.message + "\n";
+  }
+  if (info.messages.length > 0) {
+    errorsOutput.style.display = "initial";
+  } else {
+    errorsOutput.style.display = "none";
+  }
+}
+
 const canvas = document.querySelector<HTMLCanvasElement>("canvas")!;
-const stepForwardsButton = document.querySelector<HTMLButtonElement>(
-  ".step-forwards",
-)!;
 const stepBackwardsButton = document.querySelector<HTMLButtonElement>(
   ".step-backwards",
 )!;
-
-codeInput.innerText = shaderString;
+const stepForwardsButton = document.querySelector<HTMLButtonElement>(
+  ".step-forwards",
+)!;
 
 const context = canvas.getContext("webgpu")!;
 const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
@@ -76,6 +112,7 @@ function renderDebug() {
 
   let step = 0;
   let i = 0;
+  let scrollToLine: number | null = null;
   while (i < debugDataU32.length) {
     const lineNumber = debugDataU32[i++];
     const variableId = debugDataU32[i++];
@@ -96,27 +133,30 @@ function renderDebug() {
     outputLines[lineNumber] = variable.name + " = " + value;
 
     step += 1;
-    if (step > state.step) break;
+    if (step > state.step) {
+      scrollToLine = lineNumber;
+      break;
+    }
   }
 
-  codeOutput.innerText = outputLines.join("\n");
+  drawUI(outputLines, scrollToLine);
 }
-stepForwardsButton.addEventListener("click", () => {
+stepForwardsButton.onclick = () => {
   if (state.id === "debugging") {
     state.step += 1;
     renderDebug();
   }
-});
-stepBackwardsButton.addEventListener("click", () => {
+};
+stepBackwardsButton.onclick = () => {
   if (state.id === "debugging") {
     state.step = Math.max(0, state.step - 1);
     renderDebug();
   }
-});
+};
 
-canvas.addEventListener("click", (event) => {
+canvas.onclick = (event) => {
   state = { id: "request-debug", position: [event.offsetX, event.offsetY] };
-});
+};
 
 const bindGroupLayout0 = device.createBindGroupLayout({
   entries: [
@@ -137,20 +177,33 @@ const bindGroup0 = device.createBindGroup({
 });
 
 function createRenderPipeline(fragmentShader: string) {
+  let vertexShader = device.createShaderModule({
+    code: /* wgsl */ `
+struct VertexOutput {
+    @builtin(position) position: vec4f,
+    @location(0) uv: vec2f,
+}
+// See https://webgpufundamentals.org/webgpu/lessons/webgpu-post-processing.html
+@vertex
+fn vs(@builtin(vertex_index) vertexIndex : u32) -> VertexOutput {
+  var pos = array(
+    vec2f(-1.0, -1.0),
+    vec2f(-1.0,  3.0),
+    vec2f( 3.0, -1.0),
+  );
+
+  var vsOutput: VertexOutput;
+  let xy = pos[vertexIndex];
+  vsOutput.position = vec4f(xy, 0.0, 1.0);
+  vsOutput.uv = xy * vec2f(0.5, -0.5) + vec2f(0.5);
+  return vsOutput;
+}`,
+  });
+
   const module = device.createShaderModule({
     code: fragmentShader,
   });
-  module.getCompilationInfo().then((info) => {
-    errorsOutput.innerText = "";
-    for (const message of info.messages) {
-      errorsOutput.innerText += message.message + "\n";
-    }
-    if (info.messages.length > 0) {
-      errorsOutput.style.display = "initial";
-    } else {
-      errorsOutput.style.display = "none";
-    }
-  });
+  module.getCompilationInfo().then((info) => drawErrorsUI(info));
 
   return device.createRenderPipeline({
     layout: device.createPipelineLayout({
@@ -163,13 +216,7 @@ function createRenderPipeline(fragmentShader: string) {
     },
   });
 }
-let pipeline = createRenderPipeline(codeInput.innerText);
-codeInput.addEventListener(
-  "input",
-  debounce(() => {
-    pipeline = createRenderPipeline(codeInput.innerText);
-  }, 1000),
-);
+let pipeline = createRenderPipeline(shaderString);
 
 interface Variable {
   name: string;
@@ -178,10 +225,8 @@ interface Variable {
   line: number;
 }
 
-function createDebugRenderPipeline() {
-  const code = codeInput.innerText;
-
-  const lines = code.split("\n");
+function createDebugRenderPipeline(fragmentShader: string) {
+  const lines = fragmentShader.split("\n");
   const outputLines: string[] = []; // Javascript allows for arrays with holes
 
   const variables = new Map<string, Variable>();
@@ -234,23 +279,22 @@ function createDebugRenderPipeline() {
         const debugCall =
           `dbg_${variable.type}(${i},${variable.id},${debugVariable});`;
         lines[i] = line + " " + debugCall;
-        outputLines[i] = (outputLines[i] ?? "") + "  ".repeat(scopeCounter) +
-          debugCall;
+        outputLines[i] = (outputLines[i] ?? "") + debugCall;
       }
     }
   }
 
-  codeOutput.innerText = outputLines.join("\n");
+  drawUI(outputLines, null);
 
   return createRenderPipeline(lines.join("\n"));
 }
 
-createDebugRenderPipeline();
+createDebugRenderPipeline(shaderString);
 
 function render() {
   let renderPipeline = pipeline;
   if (state.id === "request-debug") {
-    renderPipeline = createDebugRenderPipeline();
+    renderPipeline = createDebugRenderPipeline(shaderString);
     writeDebug();
   }
 
