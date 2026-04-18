@@ -1,74 +1,18 @@
-import { device } from "./gpu";
-import "./style.css";
+import { device } from "./gpu.ts";
 import shaderString from "./shader.wgsl?raw";
-
-function drawUI(annotations: string[], currentLine: number | null) {
-  const codeInput = document.querySelector<HTMLPreElement>(".input")!;
-  codeInput.innerHTML = ""; // Clear existing content
-
-  // Draw the shader code with annotations
-  shaderString.split("\n").forEach((line, i) => {
-    if (i == currentLine) {
-      const highlightSpan = document.createElement("span");
-      highlightSpan.classList.add("highlight-annotation");
-      codeInput.append(highlightSpan);
-      highlightSpan.scrollIntoView({ block: "nearest" });
-    }
-
-    const codeSpan = document.createElement("span");
-    codeSpan.innerText = line;
-    codeInput.append(codeSpan);
-
-    if (annotations[i]) {
-      const annotationSpan = document.createElement("span");
-      annotationSpan.classList.add("annotation");
-      annotationSpan.innerText = annotations[i];
-      codeInput.append(annotationSpan);
-    }
-
-    codeInput.append(document.createElement("br"));
-  });
-}
-drawUI([], null);
-
-function drawErrorsUI(info: GPUCompilationInfo) {
-  const errorsOutput = document.querySelector<HTMLPreElement>(".errors")!;
-  errorsOutput.innerText = "";
-  for (const message of info.messages) {
-    errorsOutput.innerText += message.message + "\n";
-  }
-  if (info.messages.length > 0) {
-    errorsOutput.style.display = "initial";
-  } else {
-    errorsOutput.style.display = "none";
-  }
-}
+import { drawUI } from "./ui.ts";
 
 const canvas = document.querySelector<HTMLCanvasElement>("canvas")!;
-const stepBackwardsButton = document.querySelector<HTMLButtonElement>(
-  ".step-backwards",
-)!;
-const stepForwardsButton = document.querySelector<HTMLButtonElement>(
-  ".step-forwards",
-)!;
-
 const context = canvas.getContext("webgpu")!;
 const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
 context.configure({ device, format: presentationFormat });
 
-type AppState = {
-  id: "editing";
-} | {
-  id: "request-debug";
-  position: [number, number];
-} | {
-  id: "debugging";
-  step: number;
-  data: ArrayBuffer;
-};
-let state: AppState = { id: "editing" };
-
-let variablesById: Variable[] = [];
+// Create the buffers we need
+const uniformBuffer = device.createBuffer({
+  size: 4 * 4,
+  usage: GPUBufferUsage.UNIFORM |
+    GPUBufferUsage.COPY_DST,
+});
 
 const DEBUG_SIZE = 10000;
 const debugBuffer = device.createBuffer({
@@ -80,6 +24,93 @@ const debugReadBuffer = device.createBuffer({
   size: DEBUG_SIZE,
   usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
 });
+
+// Describe our shader's data layout
+const bindGroupLayout0 = device.createBindGroupLayout({
+  entries: [
+    {
+      binding: 0,
+      visibility: GPUShaderStage.FRAGMENT,
+      buffer: {
+        type: "uniform",
+      },
+    },
+    {
+      binding: 99,
+      visibility: GPUShaderStage.FRAGMENT,
+      buffer: {
+        type: "storage",
+      },
+    },
+  ],
+});
+
+// And bind it
+const bindGroup0 = device.createBindGroup({
+  layout: bindGroupLayout0,
+  entries: [
+    { binding: 0, resource: uniformBuffer },
+    { binding: 99, resource: debugBuffer },
+  ],
+});
+
+// Create the rendering pipeline
+function createRenderPipeline(fragmentShader: string) {
+  const vertexShader = device.createShaderModule({
+    code: /* wgsl */ `
+struct VertexOutput {
+    @builtin(position) position: vec4f,
+    @location(0) uv: vec2f,
+}
+// See https://webgpufundamentals.org/webgpu/lessons/webgpu-post-processing.html
+@vertex
+fn vs(@builtin(vertex_index) vertexIndex : u32) -> VertexOutput {
+  var pos = array(
+    vec2f(-1.0, -1.0),
+    vec2f(-1.0,  3.0),
+    vec2f( 3.0, -1.0),
+  );
+
+  var vsOutput: VertexOutput;
+  let xy = pos[vertexIndex];
+  vsOutput.position = vec4f(xy, 0.0, 1.0);
+  vsOutput.uv = xy * vec2f(0.5, -0.5) + vec2f(0.5);
+  return vsOutput;
+}`,
+  });
+
+  const module = device.createShaderModule({
+    code: fragmentShader,
+  });
+
+  return device.createRenderPipeline({
+    layout: device.createPipelineLayout({
+      bindGroupLayouts: [bindGroupLayout0],
+    }),
+    vertex: { module: vertexShader },
+    fragment: {
+      module,
+      targets: [{ format: presentationFormat }],
+    },
+  });
+}
+let pipeline = createRenderPipeline(shaderString);
+
+type AppState = {
+  id: "running";
+} | {
+  id: "request-debug";
+  position: [number, number];
+} | {
+  id: "debugging";
+  step: number;
+  data: ArrayBuffer;
+};
+let state: AppState = { id: "running" };
+canvas.onclick = (event) => {
+  state = { id: "request-debug", position: [event.offsetX, event.offsetY] };
+};
+
 function writeDebug() {
   if (state.id == "request-debug") {
     device.queue.writeBuffer(
@@ -101,7 +132,9 @@ async function readDebug() {
   }
   debugReadBuffer.unmap();
 }
-function renderDebug() {
+
+let variablesById: Variable[] = [];
+function renderDebugUI() {
   if (state.id !== "debugging") {
     return;
   }
@@ -141,82 +174,24 @@ function renderDebug() {
 
   drawUI(outputLines, scrollToLine);
 }
+const stepForwardsButton = document.querySelector<HTMLButtonElement>(
+  ".step-forwards",
+)!;
 stepForwardsButton.onclick = () => {
   if (state.id === "debugging") {
     state.step += 1;
-    renderDebug();
+    renderDebugUI();
   }
 };
+const stepBackwardsButton = document.querySelector<HTMLButtonElement>(
+  ".step-backwards",
+)!;
 stepBackwardsButton.onclick = () => {
   if (state.id === "debugging") {
     state.step = Math.max(0, state.step - 1);
-    renderDebug();
+    renderDebugUI();
   }
 };
-
-canvas.onclick = (event) => {
-  state = { id: "request-debug", position: [event.offsetX, event.offsetY] };
-};
-
-const bindGroupLayout0 = device.createBindGroupLayout({
-  entries: [
-    {
-      binding: 0,
-      visibility: GPUShaderStage.FRAGMENT,
-      buffer: {
-        type: "storage",
-      },
-    },
-  ],
-});
-const bindGroup0 = device.createBindGroup({
-  layout: bindGroupLayout0,
-  entries: [
-    { binding: 0, resource: debugBuffer },
-  ],
-});
-
-function createRenderPipeline(fragmentShader: string) {
-  let vertexShader = device.createShaderModule({
-    code: /* wgsl */ `
-struct VertexOutput {
-    @builtin(position) position: vec4f,
-    @location(0) uv: vec2f,
-}
-// See https://webgpufundamentals.org/webgpu/lessons/webgpu-post-processing.html
-@vertex
-fn vs(@builtin(vertex_index) vertexIndex : u32) -> VertexOutput {
-  var pos = array(
-    vec2f(-1.0, -1.0),
-    vec2f(-1.0,  3.0),
-    vec2f( 3.0, -1.0),
-  );
-
-  var vsOutput: VertexOutput;
-  let xy = pos[vertexIndex];
-  vsOutput.position = vec4f(xy, 0.0, 1.0);
-  vsOutput.uv = xy * vec2f(0.5, -0.5) + vec2f(0.5);
-  return vsOutput;
-}`,
-  });
-
-  const module = device.createShaderModule({
-    code: fragmentShader,
-  });
-  module.getCompilationInfo().then((info) => drawErrorsUI(info));
-
-  return device.createRenderPipeline({
-    layout: device.createPipelineLayout({
-      bindGroupLayouts: [bindGroupLayout0],
-    }),
-    vertex: { module: vertexShader },
-    fragment: {
-      module,
-      targets: [{ format: presentationFormat }],
-    },
-  });
-}
-let pipeline = createRenderPipeline(shaderString);
 
 interface Variable {
   name: string;
@@ -232,14 +207,8 @@ function createDebugRenderPipeline(fragmentShader: string) {
   const variables = new Map<string, Variable>();
   variablesById.length = 0;
 
-  let scopeCounter = 0;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (line.includes("{")) {
-      scopeCounter += 1;
-    } else if (line.includes("}")) {
-      scopeCounter -= 1;
-    }
 
     if (line.includes("// ignore")) {
       break;
@@ -291,7 +260,14 @@ function createDebugRenderPipeline(fragmentShader: string) {
 
 createDebugRenderPipeline(shaderString);
 
-function render() {
+const startTime = performance.now();
+function render(time: DOMHighResTimeStamp) {
+  device.queue.writeBuffer(
+    uniformBuffer,
+    0,
+    new Float32Array([time - startTime]),
+  );
+
   let renderPipeline = pipeline;
   if (state.id === "request-debug") {
     renderPipeline = createDebugRenderPipeline(shaderString);
@@ -329,10 +305,10 @@ function render() {
     };
     writeDebug();
 
-    readDebug().then(() => renderDebug()); // happens async
+    readDebug().then(() => renderDebugUI()); // happens async
   }
 
   requestAnimationFrame(render);
 }
 
-render();
+requestAnimationFrame(render);

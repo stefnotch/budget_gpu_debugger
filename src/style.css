@@ -1,5 +1,5 @@
 :root {
-  font-family: "Franklin Gothic Medium", "Arial Narrow", Arial, sans-serif;
+  font-family: "Arial Narrow", Arial, sans-serif;
   --bg: #fdfdfd;
   --bg-elevated: #eff0f3;
   --text: #1e2430;
@@ -73,7 +73,7 @@ canvas {
   border: 2px solid grey;
   bottom: 10px;
   right: 10px;
-  z-index: 20;
+  z-index: 10;
 }
 .errors {
   position: fixed;
@@ -87,4 +87,14 @@ canvas {
   background: var(--bg);
   overflow: auto;
   z-index: 20;
+}
+
+.error-message {
+  padding-bottom: 4px;
+  padding-top: 4px;
+  border-bottom: 1px solid #e1e2e5;
+  white-space: pre-wrap;
+}
+.error-message::before {
+  content: "⚠️ ";
 }

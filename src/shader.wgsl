@@ -1,3 +1,9 @@
+struct Uniforms {
+    time: f32,
+}
+
+@group(0) @binding(0) var<uniform> uniforms: Uniforms;
+
 @fragment
 fn frag_main(input: VertexOutput) -> @location(0) vec4f {
     is_debug = debug_data.debug_enabled != 0 && 
@@ -5,7 +11,7 @@ fn frag_main(input: VertexOutput) -> @location(0) vec4f {
 
     let pos: vec2f = input.uv - 0.5;
     let angle: f32 = atan2(pos.y, pos.x);
-    let t: f32 = sin(30. * (length(pos) + 0.2 * angle));
+    let t: f32 = sin(30. * (length(pos) + 0.2 * angle) + uniforms.time);
     return vec4(vec3f(t), 1);
 }
 
@@ -20,7 +26,7 @@ struct DebugData {
     length: atomic<u32>,
     data: array<u32>,
 }
-@group(0) @binding(0) var<storage, read_write> debug_data: DebugData;
+@group(0) @binding(99) var<storage, read_write> debug_data: DebugData;
 var<private> is_debug: bool;
 fn dbg_u32(line_number: u32, variable_id: u32, variable_value: u32) {
     if is_debug {

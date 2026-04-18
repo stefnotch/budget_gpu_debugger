@@ -1,3 +1,9 @@
+struct Uniforms {
+    time: f32,
+}
+
+@group(0) @binding(0) var<uniform> uniforms: Uniforms;
+
 @fragment
 fn frag_main(input: VertexOutput) -> @location(0) vec4f {
     let my_data: u32 = u32(input.position.x);
