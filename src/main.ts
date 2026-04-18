@@ -9,16 +9,14 @@ context.configure({ device, format: presentationFormat });
 
 // Create the buffers we need
 const uniformBuffer = device.createBuffer({
-  size: 4 * 4,
-  usage: GPUBufferUsage.UNIFORM |
-    GPUBufferUsage.COPY_DST,
+  size: 16,
+  usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 });
 
 const DEBUG_SIZE = 10000;
 const debugBuffer = device.createBuffer({
   size: DEBUG_SIZE,
-  usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC |
-    GPUBufferUsage.COPY_DST,
+  usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
 });
 const debugReadBuffer = device.createBuffer({
   size: DEBUG_SIZE,
@@ -28,20 +26,8 @@ const debugReadBuffer = device.createBuffer({
 // Describe our shader's data layout
 const bindGroupLayout0 = device.createBindGroupLayout({
   entries: [
-    {
-      binding: 0,
-      visibility: GPUShaderStage.FRAGMENT,
-      buffer: {
-        type: "uniform",
-      },
-    },
-    {
-      binding: 99,
-      visibility: GPUShaderStage.FRAGMENT,
-      buffer: {
-        type: "storage",
-      },
-    },
+    { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: "uniform" } },
+    { binding: 99, visibility: GPUShaderStage.FRAGMENT, buffer: { type: "storage" } },
   ],
 });
 
@@ -79,61 +65,37 @@ fn vs(@builtin(vertex_index) vertexIndex : u32) -> VertexOutput {
 }`,
   });
 
-  const module = device.createShaderModule({
-    code: fragmentShader,
-  });
-
   return device.createRenderPipeline({
     layout: device.createPipelineLayout({
       bindGroupLayouts: [bindGroupLayout0],
     }),
     vertex: { module: vertexShader },
     fragment: {
-      module,
+      module: device.createShaderModule({ code: fragmentShader }),
       targets: [{ format: presentationFormat }],
     },
   });
 }
-let pipeline = createRenderPipeline(shaderString);
+const pipeline = createRenderPipeline(shaderString);
 
-type AppState = {
-  id: "running";
-} | {
-  id: "request-debug";
-  position: [number, number];
-} | {
-  id: "debugging";
-  step: number;
-  data: ArrayBuffer;
-};
+type AppState =
+  | { id: "running" }
+  | { id: "request-debug"; position: [number, number] }
+  | { id: "debugging"; variables: Variable[]; step: number; data: ArrayBuffer };
+
 let state: AppState = { id: "running" };
+
 canvas.onclick = (event) => {
   state = { id: "request-debug", position: [event.offsetX, event.offsetY] };
 };
 
-function writeDebug() {
-  if (state.id == "request-debug") {
-    device.queue.writeBuffer(
-      debugBuffer,
-      0,
-      new Uint32Array([state.position[0], state.position[1], 1, 0]),
-    );
-  } else {
-    device.queue.writeBuffer(debugBuffer, 0, new Uint32Array([0, 0, 0, 0]));
-  }
-}
-async function readDebug() {
-  await debugReadBuffer.mapAsync(GPUMapMode.READ);
-  const results = debugReadBuffer.getMappedRange();
-  const header = new Uint32Array(results.slice(0, 16));
-  const length = header[3];
-  if (state.id === "debugging") {
-    state.data = results.slice(16, 16 + 4 * length);
-  }
-  debugReadBuffer.unmap();
+interface Variable {
+  name: string;
+  type: string;
+  id: number;
+  line: number;
 }
 
-let variablesById: Variable[] = [];
 function renderDebugUI() {
   if (state.id !== "debugging") {
     return;
@@ -149,7 +111,7 @@ function renderDebugUI() {
   while (i < debugDataU32.length) {
     const lineNumber = debugDataU32[i++];
     const variableId = debugDataU32[i++];
-    const variable = variablesById[variableId];
+    const variable = state.variables[variableId];
 
     let value = "";
     if (variable.type === "u32") {
@@ -171,41 +133,32 @@ function renderDebugUI() {
       break;
     }
   }
-
   drawUI(outputLines, scrollToLine);
 }
-const stepForwardsButton = document.querySelector<HTMLButtonElement>(
-  ".step-forwards",
-)!;
-stepForwardsButton.onclick = () => {
+document.querySelector<HTMLButtonElement>(".step-forwards")!.onclick = () => {
   if (state.id === "debugging") {
     state.step += 1;
     renderDebugUI();
   }
 };
-const stepBackwardsButton = document.querySelector<HTMLButtonElement>(
-  ".step-backwards",
-)!;
-stepBackwardsButton.onclick = () => {
+document.querySelector<HTMLButtonElement>(".step-backwards")!.onclick = () => {
   if (state.id === "debugging") {
     state.step = Math.max(0, state.step - 1);
     renderDebugUI();
   }
 };
 
-interface Variable {
-  name: string;
-  type: string;
-  id: number;
-  line: number;
-}
-
-function createDebugRenderPipeline(fragmentShader: string) {
+/**
+ * Instruments a shader with debug calls
+ */
+function instrumentShader(fragmentShader: string): {
+  debugShaderCode: string;
+  debugVariables: Variable[];
+} {
   const lines = fragmentShader.split("\n");
-  const outputLines: string[] = []; // Javascript allows for arrays with holes
-
-  const variables = new Map<string, Variable>();
-  variablesById.length = 0;
+  const outputLines: string[] = [];
+  const byName = new Map<string, Variable>();
+  const variables: Variable[] = [];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -214,76 +167,69 @@ function createDebugRenderPipeline(fragmentShader: string) {
       break;
     }
 
-    let debugVariable = "";
+    let variable: Variable | null = null;
 
     // Variable declarations
     const variableMatch = line.match(
       /(let|var|const) (?<name>[a-zA-Z0-9_]+) ?: ?(?<type>[a-zA-Z0-9_]+)/,
     );
     if (variableMatch !== null) {
-      const variable: Variable = {
-        name: variableMatch.groups!["name"],
-        type: variableMatch.groups!["type"],
-        id: variablesById.length,
+      variable = {
+        name: variableMatch.groups!.name,
+        type: variableMatch.groups!.type,
+        id: variables.length,
         line: i,
       };
-      variables.set(variable.name, variable);
-      variablesById.push(variable);
-      debugVariable = variable.name;
+      byName.set(variable.name, variable);
+      variables.push(variable);
     }
 
     // Variable assignments
     const assignmentMatch = line.match(/^ *(?<name>[a-zA-Z0-9_]+) ?= ?/);
     if (!variableMatch && assignmentMatch !== null) {
-      const name = assignmentMatch.groups!["name"];
-      debugVariable = name;
+      const name = assignmentMatch.groups!.name;
+      variable = byName.get(name) ?? null;
     }
 
-    if (debugVariable != "" && variables.has(debugVariable)) {
-      const variable = variables.get(debugVariable)!;
-      const isKnownType = ["u32", "f32", "vec2f"].includes(
-        variable.type,
-      );
-      if (isKnownType) {
-        const debugCall =
-          `dbg_${variable.type}(${i},${variable.id},${debugVariable});`;
-        lines[i] = line + " " + debugCall;
-        outputLines[i] = (outputLines[i] ?? "") + debugCall;
-      }
+    if (variable !== null && ["u32", "f32", "vec2f"].includes(variable.type)) {
+      const debugCall = `dbg_${variable.type}(${i},${variable.id},${variable.name});`;
+      lines[i] += " " + debugCall;
+      outputLines[i] = (outputLines[i] ?? "") + debugCall;
     }
   }
 
   drawUI(outputLines, null);
-
-  return createRenderPipeline(lines.join("\n"));
+  return { debugShaderCode: lines.join("\n"), debugVariables: variables };
 }
 
-createDebugRenderPipeline(shaderString);
+// Build the debug pipeline
+const { debugShaderCode, debugVariables } = instrumentShader(shaderString);
 
 const startTime = performance.now();
 function render(time: DOMHighResTimeStamp) {
-  device.queue.writeBuffer(
-    uniformBuffer,
-    0,
-    new Float32Array([time - startTime]),
-  );
+  device.queue.writeBuffer(uniformBuffer, 0, new Float32Array([time - startTime]));
 
   let renderPipeline = pipeline;
-  if (state.id === "request-debug") {
-    renderPipeline = createDebugRenderPipeline(shaderString);
-    writeDebug();
+  if (state.id == "request-debug") {
+    renderPipeline = createRenderPipeline(debugShaderCode);
+    device.queue.writeBuffer(
+      debugBuffer,
+      0,
+      new Uint32Array([state.position[0], state.position[1], 1, 0]),
+    );
   }
 
   const encoder = device.createCommandEncoder();
   const pass = encoder.beginRenderPass({
-    colorAttachments: [{
-      view: context.getCurrentTexture().createView(),
-      clearValue: [0, 0, 0, 1],
-      loadOp: "clear",
-      storeOp: "store",
-    }],
+    colorAttachments: [
+      {
+        view: context.getCurrentTexture().createView(),
+        clearValue: [0, 0, 0, 1],
+        loadOp: "clear",
+        storeOp: "store",
+      },
+    ],
   });
-
   pass.setPipeline(renderPipeline);
   pass.setBindGroup(0, bindGroup0);
   pass.draw(3);
@@ -293,19 +239,24 @@ function render(time: DOMHighResTimeStamp) {
     encoder.copyBufferToBuffer(debugBuffer, debugReadBuffer);
   }
 
-  device.queue.submit([
-    encoder.finish(),
-  ]);
+  device.queue.submit([encoder.finish()]);
 
   if (state.id === "request-debug") {
-    state = {
+    const debugState: AppState = {
       id: "debugging",
       step: 0,
       data: new ArrayBuffer(),
+      variables: debugVariables,
     };
-    writeDebug();
+    state = debugState;
+    device.queue.writeBuffer(debugBuffer, 0, new Uint32Array([0, 0, 0, 0]));
 
-    readDebug().then(() => renderDebugUI()); // happens async
+    debugReadBuffer.mapAsync(GPUMapMode.READ).then(() => {
+      const buf = debugReadBuffer.getMappedRange();
+      debugState.data = buf.slice(16, 16 + 4 * new Uint32Array(buf)[3]);
+      debugReadBuffer.unmap();
+      renderDebugUI();
+    });
   }
 
   requestAnimationFrame(render);
