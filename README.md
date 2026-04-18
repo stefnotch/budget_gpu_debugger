@@ -1,4 +1,4 @@
-# Low Budget GPU Debugger
+# Budget GPU Debugger
 
 Steps
 
