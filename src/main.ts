@@ -109,6 +109,11 @@ function render(time: DOMHighResTimeStamp) {
   device.queue.writeBuffer(uniformBuffer, 0, new Float32Array([time]));
 
   // Step 4: Write to the debug buffer
+  device.queue.writeBuffer(
+    debugBuffer,
+    0,
+    new Uint32Array([requestDebug?.[0] ?? 0, requestDebug?.[1] ?? 0, 0]),
+  );
 
   const encoder = device.createCommandEncoder();
 
