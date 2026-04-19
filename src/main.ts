@@ -72,6 +72,42 @@ function instrumentShader(fragmentShader: string): InstrumentedShader {
   const variables: Variable[] = [];
   const lines = fragmentShader.split("\n");
 
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Avoid instrumenting the debug code itself
+    if (line.includes("// <DEBUG>")) {
+      break;
+    }
+
+    let variable: Variable | null = null;
+
+    // Step 7: Detect variable declarations and assignments
+    const variableMatch = line.match(
+      /(let|var|const) (?<name>[a-zA-Z0-9_]+) ?: ?(?<type>[a-zA-Z0-9_]+)/,
+    );
+    if (variableMatch !== null) {
+      variable = {
+        name: variableMatch.groups!.name,
+        type: variableMatch.groups!.type,
+        id: variables.length,
+      };
+      variables.push(variable);
+    }
+
+    const assignmentMatch = line.match(/^ *(?<name>[a-zA-Z0-9_]+) ?= ?/);
+    if (!variableMatch && assignmentMatch !== null) {
+      const name = assignmentMatch.groups!.name;
+      variable = variables.find((v) => v.name == name) ?? null;
+    }
+
+    if (variable !== null && ["u32", "f32", "vec2f"].includes(variable.type)) {
+      // Step 7: Finish debugCall
+      const debugCall = `print_${variable.type}(${i}, ${variable.id}, ${variable.name});`;
+      lines[i] += " " + debugCall;
+    }
+  }
+
   return {
     code: lines.join("\n"),
     variables,
@@ -80,16 +116,12 @@ function instrumentShader(fragmentShader: string): InstrumentedShader {
 
 // Step 7: Create the instrumented render pipeline
 const instrumented = instrumentShader(fragmentShaderString);
-const debugPipeline = null;
+const debugPipeline = createRenderPipeline(instrumented.code);
 
 const debugData = {
   data: new ArrayBuffer(0),
   // Step 7: Change this to `variables: instrumented.variables`
-  variables: [
-    { id: 0, name: "pos", type: "vec2f" },
-    { id: 1, name: "angle", type: "f32" },
-    { id: 2, name: "t", type: "f32" },
-  ] satisfies Variable[],
+  variables: instrumented.variables,
   step: 0,
 };
 
@@ -130,7 +162,11 @@ function render(time: DOMHighResTimeStamp) {
 
   // Step 1:
   // Set the pipeline and the bind group
-  pass.setPipeline(pipeline);
+  if (requestDebug != null) {
+    pass.setPipeline(debugPipeline);
+  } else {
+    pass.setPipeline(pipeline);
+  }
   pass.setBindGroup(0, bindGroup0);
   // Then draw 3 vertices for our fullscreen triangle
   pass.draw(3);
