@@ -10,6 +10,9 @@ fn frag_main(input: VertexOutput) -> @location(0) vec4f {
     // Step 4: Set the `is_debug` variable
 
     // Step 3: Call the print function
+    if all(vec2u(input.position.xy) == debug_data.debug_position) {
+        print(42);
+    }
 
     // Step 2: Use the `time` variable
     let pos: vec2f = input.uv - 0.5;
@@ -26,7 +29,17 @@ struct VertexOutput {
 // <DEBUG>
 
 // Step 3: Add the debug buffer
+struct DebugData {
+    debug_position: vec2u,
+    length: atomic<u32>,
+    data: array<u32>,
+}
+@group(0) @binding(99) var<storage, read_write> debug_data: DebugData;
 
 // Step 3: Write a `print(value: u32)` function that writes to the debug buffer.
+fn print(value: u32) {
+    let i = atomicAdd(&debug_data.length, 1);
+    debug_data.data[i] = value;
+}
 
 // Step 4: Add the `is_debug` variable

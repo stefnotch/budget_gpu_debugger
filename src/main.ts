@@ -17,21 +17,30 @@ const uniformBuffer = device.createBuffer({
 });
 
 // Step 3: Create the debug buffers
+const DEBUG_SIZE = 10000;
+const debugBuffer = device.createBuffer({
+  size: DEBUG_SIZE,
+  usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+});
+const debugReadBuffer = device.createBuffer({
+  size: DEBUG_SIZE,
+  usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+});
 
 // Step 2: Modify the bind group and layout to include the uniform buffer
 // Step 3: Add the debug buffer to the layout
 const bindGroupLayout0 = device.createBindGroupLayout({
   entries: [
-    {
-      binding: 0,
-      visibility: GPUShaderStage.FRAGMENT,
-      buffer: { type: "uniform" },
-    },
+    { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: "uniform" } },
+    { binding: 99, visibility: GPUShaderStage.FRAGMENT, buffer: { type: "storage" } },
   ],
 });
 const bindGroup0 = device.createBindGroup({
   layout: bindGroupLayout0,
-  entries: [{ binding: 0, resource: uniformBuffer }],
+  entries: [
+    { binding: 0, resource: uniformBuffer },
+    { binding: 99, resource: debugBuffer },
+  ],
 });
 
 function createRenderPipeline(fragmentShader: string): GPURenderPipeline {
@@ -125,12 +134,22 @@ function render(time: DOMHighResTimeStamp) {
 
   if (requestDebug != null) {
     // Step 3: Copy to our CPU readable buffer
+    encoder.copyBufferToBuffer(debugBuffer, debugReadBuffer);
   }
 
   device.queue.submit([encoder.finish()]);
 
   if (requestDebug != null) {
     // Step 3: Read the data to the CPU into debugData.data
+    debugReadBuffer.mapAsync(GPUMapMode.READ).then(() => {
+      const buf = debugReadBuffer.getMappedRange();
+      const header = new Uint32Array(buf.slice(0, 12));
+      const length = header[2];
+      const data = buf.slice(12, 12 + 4 * length);
+      console.log(new Uint32Array(data)); // Step 5: Store and draw the debug data
+      debugReadBuffer.unmap();
+    });
+    requestDebug = null;
   }
 
   frameId = requestAnimationFrame(render);
