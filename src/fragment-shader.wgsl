@@ -1,4 +1,9 @@
 // Step 2: Add a uniform buffer with the time
+struct Uniforms {
+    time: f32,
+}
+@group(0) @binding(0)
+var<uniform> uniforms: Uniforms;
 
 @fragment
 fn frag_main(input: VertexOutput) -> @location(0) vec4f {
@@ -8,7 +13,7 @@ fn frag_main(input: VertexOutput) -> @location(0) vec4f {
 
     // Step 2: Use the `time` variable
     let pos: vec2f = input.uv - 0.5;
-    let angle: f32 = atan2(pos.y, pos.x);
+    let angle: f32 = atan2(pos.y, pos.x) + 0.0003 * uniforms.time;
     let t: f32 = sin(30. * (length(pos) + 0.2 * angle));
     return vec4(vec3f(t), 1);
 }
