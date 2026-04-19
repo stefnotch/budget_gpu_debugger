@@ -132,6 +132,14 @@ canvas.onclick = (event) => {
 };
 
 // Step 8: Add the click handlers for the step buttons
+document.querySelector<HTMLButtonElement>(".step-forwards")!.onclick = () => {
+  debugData.step += 1;
+  drawDebugUI(debugData.data, debugData.variables, debugData.step);
+};
+document.querySelector<HTMLButtonElement>(".step-backwards")!.onclick = () => {
+  debugData.step -= 1;
+  drawDebugUI(debugData.data, debugData.variables, debugData.step);
+};
 
 // This starts the rendering loop
 let frameId = requestAnimationFrame(render);

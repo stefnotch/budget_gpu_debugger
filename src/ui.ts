@@ -73,6 +73,8 @@ export function drawDebugUI(data: ArrayBuffer, variables: Variable[], maxStep: n
 
   let index = 0;
 
+  let step = 0;
+
   while (index < view.byteLength) {
     // Step 6: Use the `variables` to decode the more complex `data` format.
     const line = view.getU32(index);
@@ -97,6 +99,11 @@ export function drawDebugUI(data: ArrayBuffer, variables: Variable[], maxStep: n
     }
 
     // Step 8: Use the `step` to only draw the first few print statements.
+    step += 1;
+    if (step > maxStep) {
+      scrollToLine = line;
+      break;
+    }
   }
 
   drawUI(outputLines, scrollToLine);
