@@ -151,8 +151,11 @@ function render(time: DOMHighResTimeStamp) {
       const header = new Uint32Array(buf.slice(0, 12));
       const length = header[2];
       const data = buf.slice(12, 12 + 4 * length);
-      console.log(new Uint32Array(data)); // Step 5: Store and draw the debug data
+      // Step 5: Store and draw the debug data
+      debugData.data = data;
+      debugData.step = 0;
       debugReadBuffer.unmap();
+      drawDebugUI(debugData.data, debugData.variables, debugData.step);
     });
     requestDebug = null;
   }

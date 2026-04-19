@@ -71,10 +71,16 @@ export function drawDebugUI(data: ArrayBuffer, variables: Variable[], maxStep: n
   // Step 5: Read the `data` and write it to `outputLines`
   const view = new WgslDataView(data);
 
-  while (false /* Step 5: Loop until we've read all the data */) {
+  let index = 0;
+
+  while (index < view.byteLength) {
     // Step 5: Read the data and write it to `outputLines`
+    outputLines[index] = view.getU32(index) + "";
+
     // Step 6: Use the `variables` to decode the more complex `data` format.
+
     // Step 8: Use the `step` to only draw the first few print statements.
+    index += 4;
   }
 
   drawUI(outputLines, scrollToLine);
