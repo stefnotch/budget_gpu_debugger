@@ -74,13 +74,29 @@ export function drawDebugUI(data: ArrayBuffer, variables: Variable[], maxStep: n
   let index = 0;
 
   while (index < view.byteLength) {
-    // Step 5: Read the data and write it to `outputLines`
-    outputLines[index] = view.getU32(index) + "";
-
     // Step 6: Use the `variables` to decode the more complex `data` format.
+    const line = view.getU32(index);
+    index += 4;
+    const variableId = view.getU32(index);
+    index += 4;
+    const variable = variables[variableId];
+
+    if (variable.type === "u32") {
+      // Read value and write to `outputLines[line]`.
+      outputLines[line] = variable.name + " = " + view.getU32(index);
+      index += 4;
+    } else if (variable.type === "f32") {
+      outputLines[line] = variable.name + " = " + view.getF32(index);
+      index += 4;
+    } else if (variable.type === "vec2f") {
+      outputLines[line] =
+        variable.name + " = " + view.getF32(index) + ", " + view.getF32(index + 4);
+      index += 8;
+    } else {
+      console.error("Unknown type", variable.type);
+    }
 
     // Step 8: Use the `step` to only draw the first few print statements.
-    index += 4;
   }
 
   drawUI(outputLines, scrollToLine);
