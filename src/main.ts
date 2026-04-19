@@ -25,7 +25,7 @@ const bindGroup0 = device.createBindGroup({
 
 function createRenderPipeline(fragmentShader: string): GPURenderPipeline {
   // Step 1: Create a vertex shader that draws a single triangle that covers the screen.
-  const vertexShader = null as any;
+  const vertexShader = device.createShaderModule({ code: vertexShaderString });
 
   return device.createRenderPipeline({
     layout: device.createPipelineLayout({
@@ -40,7 +40,7 @@ function createRenderPipeline(fragmentShader: string): GPURenderPipeline {
 }
 
 // Step 1: Call createRenderPipeline with the fragmentShaderString
-const pipeline = null;
+const pipeline = createRenderPipeline(fragmentShaderString);
 
 /** A shader instrumented with debugging function calls. */
 interface InstrumentedShader {
@@ -104,8 +104,12 @@ function render(time: DOMHighResTimeStamp) {
 
   // Step 1:
   // Set the pipeline and the bind group
+  pass.setPipeline(pipeline);
+  pass.setBindGroup(0, bindGroup0);
   // Then draw 3 vertices for our fullscreen triangle
+  pass.draw(3);
   // Finally, end the render pass
+  pass.end();
 
   if (requestDebug != null) {
     // Step 3: Copy to our CPU readable buffer
