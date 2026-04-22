@@ -1,5 +1,4 @@
 import { device } from "./gpu.ts";
-import { drawUI, drawDebugUI, type Variable } from "./ui.ts";
 import vertexShaderString from "./vertex-shader.wgsl?raw";
 import fragmentShaderString from "./fragment-shader.wgsl?raw";
 
@@ -53,45 +52,6 @@ function createRenderPipeline(fragmentShader: string): GPURenderPipeline {
 // Step 1: Call createRenderPipeline with the fragmentShaderString
 const pipeline = createRenderPipeline(fragmentShaderString);
 
-/** A shader instrumented with debugging function calls. */
-interface InstrumentedShader {
-  code: string;
-  variables: Variable[];
-}
-function instrumentShader(fragmentShader: string): InstrumentedShader {
-  // Step 7: Shader instrumentation
-  const variables: Variable[] = [];
-  const lines = fragmentShader.split("\n");
-
-  return {
-    code: lines.join("\n"),
-    variables,
-  };
-}
-
-// Step 7: Create the instrumented render pipeline
-const instrumented = instrumentShader(fragmentShaderString);
-const debugPipeline = null;
-
-const debugData = {
-  data: new ArrayBuffer(0),
-  // Step 7: Change this to `variables: instrumented.variables`
-  variables: [
-    { id: 0, name: "pos", type: "vec2f" },
-    { id: 1, name: "angle", type: "f32" },
-    { id: 2, name: "t", type: "f32" },
-  ] satisfies Variable[],
-  step: 0,
-};
-
-// When we click on a pixel, we want to debug that pixel
-let requestDebug: [number, number] | null = null;
-canvas.onclick = (event) => {
-  requestDebug = [event.offsetX, event.offsetY];
-};
-
-// Step 8: Add the click handlers for the step buttons
-
 // This starts the rendering loop
 let frameId = requestAnimationFrame(render);
 
@@ -123,15 +83,7 @@ function render(time: DOMHighResTimeStamp) {
   // Finally, end the render pass
   pass.end();
 
-  if (requestDebug != null) {
-    // Step 3: Copy to our CPU readable buffer
-  }
-
   device.queue.submit([encoder.finish()]);
-
-  if (requestDebug != null) {
-    // Step 3: Read the data to the CPU into debugData.data
-  }
 
   frameId = requestAnimationFrame(render);
 }
