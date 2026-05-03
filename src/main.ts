@@ -131,6 +131,8 @@ canvas.onclick = (event) => {
   requestDebug = [event.offsetX, event.offsetY];
 };
 
+let liveUpdateCheckbox = document.querySelector<HTMLInputElement>(".live-update")!;
+
 // Step 8: Add the click handlers for the step buttons
 document.querySelector<HTMLButtonElement>(".step-forwards")!.onclick = () => {
   debugData.step += 1;
@@ -144,7 +146,7 @@ document.querySelector<HTMLButtonElement>(".step-backwards")!.onclick = () => {
 // This starts the rendering loop
 let frameId = requestAnimationFrame(render);
 
-function render(time: DOMHighResTimeStamp) {
+async function render(time: DOMHighResTimeStamp) {
   // Step 2: Update the time
   device.queue.writeBuffer(uniformBuffer, 0, new Float32Array([time]));
 
@@ -190,18 +192,22 @@ function render(time: DOMHighResTimeStamp) {
 
   if (requestDebug != null) {
     // Step 3: Read the data to the CPU into debugData.data
-    debugReadBuffer.mapAsync(GPUMapMode.READ).then(() => {
+    await debugReadBuffer.mapAsync(GPUMapMode.READ).then(() => {
       const buf = debugReadBuffer.getMappedRange();
       const header = new Uint32Array(buf.slice(0, 12));
       const length = header[2];
       const data = buf.slice(12, 12 + 4 * length);
       // Step 5: Store and draw the debug data
       debugData.data = data;
-      debugData.step = 0;
+      if (!liveUpdateCheckbox.checked) {
+        debugData.step = 0;
+      }
       debugReadBuffer.unmap();
       drawDebugUI(debugData.data, debugData.variables, debugData.step);
     });
-    requestDebug = null;
+    if (!liveUpdateCheckbox.checked) {
+      requestDebug = null;
+    }
   }
 
   frameId = requestAnimationFrame(render);
